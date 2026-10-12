@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en-US">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+<!-- Begin Jekyll SEO tag v2.8.0 -->
+<title>Calling an OpenAI-Compatible API From Rust: async-openai With a Custom Base URL, Streaming and Timeouts</title>
+<meta property="og:title" content="Calling an OpenAI-Compatible API From Rust: async-openai With a Custom Base URL, Streaming and Timeouts">
+<meta property="og:locale" content="en_US">
+<link rel="canonical" href="https://ankita37105.github.io/llm-api-cost-notes/rust-async-openai-custom-base-url.html">
+<meta property="og:url" content="https://ankita37105.github.io/llm-api-cost-notes/rust-async-openai-custom-base-url.html">
+<meta property="og:site_name" content="llm-api-cost-notes">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary">
+<meta property="twitter:title" content="Calling an OpenAI-Compatible API From Rust: async-openai With a Custom Base URL, Streaming and Timeouts">
+<!-- End Jekyll SEO tag -->
+
+    <link rel="stylesheet" href="/llm-api-cost-notes/assets/css/style.css">
+    <!-- start custom head snippets, customize with your own _includes/head-custom.html file -->
+
+<!-- Setup Google Analytics -->
+
+
+
+<!-- You can set your favicon here -->
+<!-- link rel="shortcut icon" type="image/x-icon" href="/llm-api-cost-notes/favicon.ico" -->
+
+<!-- end custom head snippets -->
+
+  </head>
+  <body>
+    <div class="container-lg px-3 my-5 markdown-body">
+
+      <h1>Calling an OpenAI-Compatible API From Rust: async-openai With a Custom Base URL, Streaming and Timeouts</h1>
+
+<p>I'm Aman Kumar. A Rust question I get fairly often goes like this: "I added <code>async-openai</code>, pointed it at a non-OpenAI endpoint, and now either nothing compiles or every request fails." Usually it's one of three things. The chat API isn't enabled in Cargo, the base URL is a little off, or the model ID is a guess.</p>
+<p>This post walks through using <code>async-openai</code> (version 0.42 at the time of writing) against any OpenAI-compatible API. It covers the setup, a normal request, streaming, timeouts and retries, and how I turn errors into something I can act on. My examples use APIClaw, an OpenAI-compatible gateway I build, so weigh that accordingly. Nothing below is specific to it. The same code works against vLLM, LiteLLM, Ollama's <code>/v1</code> endpoint or any other server that implements <code>/v1/chat/completions</code>.</p>
+<h2>Step 1: enable the right Cargo features</h2>
+<p>This is the one that surprises people. In current versions of <code>async-openai</code>, the default feature set only picks a TLS backend (<code>rustls</code>). The API groups are opt-in. If you run <code>cargo add async-openai</code> and then write <code>client.chat()</code>, the compiler will tell you that method doesn't exist.</p>
+<p>Turn on what you use:</p>
+<pre><code class="language-toml">[dependencies]
+async-openai = { version = &quot;0.42&quot;, features = [&quot;chat-completion&quot;, &quot;model&quot;] }
+reqwest = &quot;0.13&quot;
+tokio = { version = &quot;1&quot;, features = [&quot;full&quot;] }
+futures = &quot;0.3&quot;
+</code></pre>
+<p><code>chat-completion</code> gives you Chat Completions plus streaming. <code>model</code> gives you <code>client.models().list()</code>, which I always use to check model IDs. There are separate flags for <code>embedding</code>, <code>responses</code> and the other API families if you need them.</p>
+<p>I add <code>reqwest</code> directly only because I pass in my own HTTP client (Step 4). Keep it on the same major version that <code>async-openai</code> uses (0.13 for the 0.42 line). If the versions differ, Cargo pulls in two copies of reqwest and <code>with_http_client</code> won't accept your client. The resulting type error is confusing, but the fix is simply to match the versions.</p>
+<h2>Step 2: set the base URL and key</h2>
+<p>The client reads <code>OPENAI_API_KEY</code> and <code>OPENAI_BASE_URL</code> from the environment by default. That's handy, but I'd rather be explicit, especially when one service talks to more than one provider:</p>
+<pre><code class="language-rust">use async_openai::{config::OpenAIConfig, Client};
+
+fn make_config() -&gt; OpenAIConfig {
+    let api_base = std::env::var(&quot;LLM_BASE_URL&quot;)
+        .unwrap_or_else(|_| &quot;https://apiclaw.biz/v1&quot;.to_string());
+    let api_key = std::env::var(&quot;LLM_API_KEY&quot;).expect(&quot;LLM_API_KEY not set&quot;);
+
+    OpenAIConfig::new()
+        .with_api_base(api_base.trim_end_matches('/'))
+        .with_api_key(api_key)
+}
+</code></pre>
+<p>There are two details here, and both cause 404s.</p>
+<p><strong>Include <code>/v1</code>, and nothing after it.</strong> The crate builds each URL by gluing the base onto a path such as <code>/chat/completions</code>, so the base has to end at the version segment. Don't use the bare domain (that drops <code>/v1</code>), and don't use the full <code>.../v1/chat/completions</code> endpoint (that doubles the path).</p>
+<p><strong>No trailing slash.</strong> Because the join is plain string concatenation, <code>https://example.com/v1/</code> turns into <code>https://example.com/v1//chat/completions</code>. Some servers tolerate the double slash and many don't. The <code>trim_end_matches('/')</code> call is there so a slash that sneaks in through an environment variable can't break the URL.</p>
+<h2>Step 3: a plain request</h2>
+<pre><code class="language-rust">use async_openai::types::chat::{
+    ChatCompletionRequestSystemMessageArgs, ChatCompletionRequestUserMessageArgs,
+    CreateChatCompletionRequestArgs,
+};
+
+async fn ask(client: &amp;Client&lt;OpenAIConfig&gt;, model: &amp;str) -&gt; Result&lt;(), Box&lt;dyn std::error::Error&gt;&gt; {
+    let request = CreateChatCompletionRequestArgs::default()
+        .model(model)
+        .max_tokens(400u32)
+        .messages([
+            ChatCompletionRequestSystemMessageArgs::default()
+                .content(&quot;You are a concise assistant.&quot;)
+                .build()?
+                .into(),
+            ChatCompletionRequestUserMessageArgs::default()
+                .content(&quot;Explain what a base URL is in one paragraph.&quot;)
+                .build()?
+                .into(),
+        ])
+        .build()?;
+
+    let response = client.chat().create(request).await?;
+    if let Some(choice) = response.choices.first() {
+        println!(&quot;{}&quot;, choice.message.content.as_deref().unwrap_or(&quot;&quot;));
+    }
+    if let Some(usage) = response.usage {
+        println!(&quot;tokens: {} in, {} out&quot;, usage.prompt_tokens, usage.completion_tokens);
+    }
+    Ok(())
+}
+</code></pre>
+<p><code>model</code> takes a plain string, so you aren't limited to OpenAI's model names. Keep it in config rather than in code. Then switching models is an environment change, not a rebuild.</p>
+<p><strong>Get the model ID from the server.</strong> A wrong model ID is the most common failure I see with any gateway. Before writing anything else, I list what the key can actually see:</p>
+<pre><code class="language-rust">let models = client.models().list().await?;
+for m in models.data {
+    println!(&quot;{}&quot;, m.id);
+}
+</code></pre>
+<p>Copy the ID exactly as it prints, including any prefix or version suffix. For APIClaw, the same IDs are also listed on its public model hub.</p>
+<h2>Step 4: timeouts</h2>
+<p>The default client is built on a <code>reqwest::Client</code> with no timeouts at all. That's fine in a script and risky in a server: a stalled upstream connection can hold a task forever. I build my own HTTP client and pass it in:</p>
+<pre><code class="language-rust">use std::time::Duration;
+
+fn make_client() -&gt; Client&lt;OpenAIConfig&gt; {
+    let http = reqwest::Client::builder()
+        .connect_timeout(Duration::from_secs(10))
+        .read_timeout(Duration::from_secs(60))
+        .build()
+        .expect(&quot;failed to build HTTP client&quot;);
+
+    Client::with_config(make_config()).with_http_client(http)
+}
+</code></pre>
+<p>I use <code>read_timeout</code> rather than <code>timeout</code> on purpose. In reqwest, <code>timeout</code> is a total deadline that runs until the response body has finished. For a streamed answer that takes two minutes to generate, that deadline kills a perfectly healthy stream. <code>read_timeout</code> resets after every successful read, so it catches a stalled connection without punishing a long one. If you only make short, non-streaming calls, a total <code>timeout</code> is fine too.</p>
+<h2>Step 5: streaming</h2>
+<pre><code class="language-rust">use futures::StreamExt;
+use std::io::{stdout, Write};
+
+let mut stream = client.chat().create_stream(request).await?;
+let mut out = stdout().lock();
+while let Some(item) = stream.next().await {
+    match item {
+        Ok(chunk) =&gt; {
+            for choice in &amp;chunk.choices {
+                if let Some(text) = &amp;choice.delta.content {
+                    write!(out, &quot;{text}&quot;)?;
+                }
+            }
+            out.flush()?;
+        }
+        Err(e) =&gt; {
+            eprintln!(&quot;\nstream error: {e}&quot;);
+            break;
+        }
+    }
+}
+</code></pre>
+<p>A few things are worth knowing. <code>create_stream</code> sets <code>stream: true</code> for you, and calling <code>create</code> on a request that has <code>stream</code> set returns an <code>InvalidArgument</code> error, so build the request without it. Iterate over <code>choices</code> instead of indexing <code>[0]</code>. If you turn on usage reporting through the request's <code>stream_options</code>, the final usage chunk has an empty <code>choices</code> array, and indexing would panic on it. Stdout is line-buffered, so flush after each chunk if you want the text to appear as it arrives.</p>
+<h2>Step 6: retries are already on</h2>
+<p>In the 0.42 line, the default client wraps every request in a retry layer. It retries up to three times on 429s, 5xx responses and connection errors, with exponential backoff starting at 100 ms and capped at 8 seconds. It also respects a <code>Retry-After</code> header. For streams, the retry covers getting the response started. A connection that drops halfway through an answer is not replayed, so handle the <code>Err</code> arm in your loop. It deliberately does not retry a 429 whose error code is <code>insufficient_quota</code>, because waiting won't fix a billing limit.</p>
+<p>So don't wrap calls in a second retry loop of your own. Stacking retries multiplies the request count during an outage, which is exactly when the upstream is struggling. If you need different behaviour, the crate supports Tower middleware behind the <code>middleware</code> feature, and you can replace the policy there.</p>
+<h2>Step 7: turn errors into actions</h2>
+<p>Every call returns <code>OpenAIError</code>. The variants I care about map neatly to fixes:</p>
+<pre><code class="language-rust">use async_openai::error::OpenAIError;
+
+fn describe(err: &amp;OpenAIError) -&gt; String {
+    match err {
+        OpenAIError::ApiError(resp) =&gt; match resp.status_code.as_u16() {
+            401 =&gt; &quot;bad or missing API key&quot;.into(),
+            404 =&gt; format!(&quot;wrong path or model ID: {}&quot;, resp.api_error.message),
+            429 =&gt; &quot;rate limited or out of quota&quot;.into(),
+            code =&gt; format!(&quot;HTTP {code}: {}&quot;, resp.api_error.message),
+        },
+        OpenAIError::JSONDeserialize(e, body) =&gt; {
+            format!(&quot;response did not match the expected shape ({e}); body: {body}&quot;)
+        }
+        OpenAIError::Reqwest(e) if e.is_timeout() =&gt; &quot;request timed out&quot;.into(),
+        other =&gt; other.to_string(),
+    }
+}
+</code></pre>
+<p><code>JSONDeserialize</code> deserves a note. Compatible servers sometimes add or omit fields compared with OpenAI's spec, and the crate's strongly typed responses can reject them. When that happens, the <code>byot</code> ("bring your own types") feature adds <code>_byot</code> versions of the methods, such as <code>create_byot</code>. Those accept and return your own types, including a plain <code>serde_json::Value</code>. I use that as an escape hatch for one odd endpoint rather than giving up on the typed API everywhere.</p>
+<h2>A short checklist when it fails</h2>
+<ol>
+<li>Does it compile? If <code>chat()</code> is missing, add the <code>chat-completion</code> feature.</li>
+<li>Is the base URL <code>https://host/v1</code> with no trailing slash and no <code>/chat/completions</code>?</li>
+<li>Did the model ID come from <code>models().list()</code> with the same key?</li>
+<li>Is the error a 401 (the key), a 404 (the path or model) or a 429 (the rate or quota)? Match on <code>status_code</code> instead of reading strings.</li>
+<li>Are long streams dying at a fixed time? Swap a total <code>timeout</code> for <code>read_timeout</code>.</li>
+</ol>
+<p>That covers nearly every Rust integration problem I've debugged against OpenAI-compatible servers. The crate does most of the work. You just have to give it the right features, a clean base URL and a real model ID.</p>
+<p><em>Disclosure: I build <a href="https://apiclaw.biz">APIClaw</a>, the OpenAI-compatible gateway used in these examples. Everything here applies to any compatible endpoint.</em></p>
+
+
+    </div>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/anchor-js/4.1.0/anchor.min.js" integrity="sha256-lZaRhKri35AyJSypXXs4o6OPFTbTmUoltBbDCbdzegg=" crossorigin="anonymous"></script>
+    <script>anchors.add();</script>
+
+
+</body>
+</html>
