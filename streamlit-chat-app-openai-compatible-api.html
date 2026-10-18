@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en-US">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+<!-- Begin Jekyll SEO tag v2.8.0 -->
+<title>Building a Streamlit Chat App on an OpenAI-Compatible API: Secrets That Turn Into Env Vars, st.write_stream and the Orphaned User Message</title>
+<meta property="og:title" content="Building a Streamlit Chat App on an OpenAI-Compatible API: Secrets That Turn Into Env Vars, st.write_stream and the Orphaned User Message">
+<meta name="description" content="What a Streamlit chat app actually sends to a non-OpenAI endpoint, how secrets.toml feeds the OpenAI client, how to keep token usage when st.write_stream eats the stream, and the failed-turn bug almost every tutorial has.">
+<meta property="og:description" content="What a Streamlit chat app actually sends to a non-OpenAI endpoint, how secrets.toml feeds the OpenAI client, how to keep token usage when st.write_stream eats the stream, and the failed-turn bug almost every tutorial has.">
+<meta property="og:locale" content="en_US">
+<link rel="canonical" href="https://ankita37105.github.io/llm-api-cost-notes/streamlit-chat-app-openai-compatible-api.html">
+<meta property="og:url" content="https://ankita37105.github.io/llm-api-cost-notes/streamlit-chat-app-openai-compatible-api.html">
+<meta property="og:site_name" content="llm-api-cost-notes">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary">
+<meta property="twitter:title" content="Building a Streamlit Chat App on an OpenAI-Compatible API: Secrets That Turn Into Env Vars, st.write_stream and the Orphaned User Message">
+<!-- End Jekyll SEO tag -->
+
+    <link rel="stylesheet" href="/llm-api-cost-notes/assets/css/style.css">
+    <!-- start custom head snippets, customize with your own _includes/head-custom.html file -->
+
+<!-- Setup Google Analytics -->
+
+
+
+<!-- You can set your favicon here -->
+<!-- link rel="shortcut icon" type="image/x-icon" href="/llm-api-cost-notes/favicon.ico" -->
+
+<!-- end custom head snippets -->
+
+  </head>
+  <body>
+    <div class="container-lg px-3 my-5 markdown-body">
+
+      <h1>Building a Streamlit Chat App on an OpenAI-Compatible API: Secrets That Turn Into Env Vars, st.write_stream and the Orphaned User Message</h1>
+<p>Streamlit is still the fastest way I know to put a chat box in front of a model for a demo or an internal tool. The official chat tutorial is written for api.openai.com, though, and a few things behave differently once you point the client at another OpenAI-compatible endpoint: a vLLM server, a company proxy or a hosted gateway.</p>
+<p>I built the app below with Streamlit 1.66.0, openai 3.35.1 and Python 3.13, and drove it with Streamlit's own <code>AppTest</code> harness against a small local mock server that logged every request and could fail on demand. Everything described here is what went over the wire. The examples point at APIClaw, an OpenAI-compatible gateway I build, so weigh my opinions accordingly. Its base URL is <code>https://apiclaw.biz/v1</code>; replace <code>YOUR_MODEL_ID</code> with an exact ID from your provider's model list.</p>
+<h2>The starting point</h2>
+<p>This is the shape most tutorials give you, with the base URL added:</p>
+<pre><code class="language-python">import streamlit as st
+from openai import OpenAI
+
+@st.cache_resource
+def get_client():
+    return OpenAI(
+        base_url=st.secrets[&quot;OPENAI_BASE_URL&quot;],
+        api_key=st.secrets[&quot;OPENAI_API_KEY&quot;],
+    )
+
+client = get_client()
+MODEL = st.secrets[&quot;MODEL&quot;]
+
+if &quot;messages&quot; not in st.session_state:
+    st.session_state.messages = []
+
+for m in st.session_state.messages:
+    with st.chat_message(m[&quot;role&quot;]):
+        st.markdown(m[&quot;content&quot;])
+
+if prompt := st.chat_input(&quot;Ask something&quot;):
+    st.session_state.messages.append({&quot;role&quot;: &quot;user&quot;, &quot;content&quot;: prompt})
+    with st.chat_message(&quot;user&quot;):
+        st.markdown(prompt)
+    with st.chat_message(&quot;assistant&quot;):
+        stream = client.chat.completions.create(
+            model=MODEL, messages=st.session_state.messages, stream=True
+        )
+        reply = st.write_stream(stream)
+    st.session_state.messages.append({&quot;role&quot;: &quot;assistant&quot;, &quot;content&quot;: reply})
+</code></pre>
+<p>And <code>.streamlit/secrets.toml</code> next to it:</p>
+<pre><code class="language-toml">OPENAI_API_KEY = &quot;sk-...&quot;
+OPENAI_BASE_URL = &quot;https://apiclaw.biz/v1&quot;
+MODEL = &quot;YOUR_MODEL_ID&quot;
+</code></pre>
+<p>It works. Requests go to <code>POST /v1/chat/completions</code> with <code>Authorization: Bearer &lt;key&gt;</code>, and <code>st.write_stream</code> accepts the SDK's stream object directly and returns the full reply as a plain <code>str</code>. The base URL must include <code>/v1</code>, because the SDK appends <code>/chat/completions</code> to whatever you give it. Add <code>.streamlit/secrets.toml</code> to <code>.gitignore</code> before your first commit.</p>
+<h2>Root-level secrets become environment variables, but only after you touch st.secrets</h2>
+<p>Streamlit copies root-level keys from <code>secrets.toml</code> into <code>os.environ</code>. I checked when that happens: in a test app, <code>os.environ.get("OPENAI_API_KEY")</code> was <code>None</code> at the top of the script and <code>"sk-..."</code> right after the first <code>st.secrets[...]</code> lookup.</p>
+<p>That has two practical effects. First, a bare <code>OpenAI()</code> with no arguments placed before any <code>st.secrets</code> access raised <code>OpenAIError</code> for the missing key, while the same call placed after one access picked up both <code>OPENAI_API_KEY</code> and <code>OPENAI_BASE_URL</code> and sent requests to the custom endpoint. So an app can work or fail depending on line order. Second, because both names are exported, any other library in the same process that reads <code>OPENAI_BASE_URL</code> will now send its traffic to your gateway too. That's usually what you want, but it surprised me when an unrelated helper started hitting the gateway.</p>
+<p>I pass <code>base_url</code> and <code>api_key</code> explicitly, as above, so the client doesn't depend on that side effect. If you'd rather not export the values at all, nest them in a table, such as <code>[llm]</code> with <code>st.secrets["llm"]["api_key"]</code>. In my test, only root-level keys were exported.</p>
+<h2>Why the client goes in cache_resource</h2>
+<p>Streamlit reruns the whole script on every interaction: each chat message, and also every button click or slider change. In my test, clicking an unrelated button reran the script but sent no request, because <code>st.chat_input</code> only returns a value on the run where the user submitted something. Without caching, the client constructor would run again on every one of those reruns. <code>@st.cache_resource</code> builds one client per process and shares it across reruns and sessions. That's fine here, because the OpenAI client is safe to share and holds no per-user state. Don't put a per-user key in a cached client.</p>
+<h2>Every turn resends the whole conversation</h2>
+<p><code>st.session_state.messages</code> grows by two entries per turn, and the full list goes out every time. My mock saw 1, then 3, then 5 messages on three consecutive turns. On a flat-rate plan that mostly affects latency and context limits. On per-token billing, it means a long session costs much more per turn than a short one. If your users keep one tab open all day, cap the list or summarize older turns before sending.</p>
+<h2>Keeping token usage when st.write_stream consumes the stream</h2>
+<p>Streaming responses only include token counts if you ask for them with <code>stream_options={"include_usage": True}</code>. The server then sends one extra chunk at the end with an empty <code>choices</code> list and a <code>usage</code> object. <code>st.write_stream</code> handled that chunk without complaint in my test, but it consumes the stream and returns only the text, so the usage is gone.</p>
+<p>The fix is to hand <code>st.write_stream</code> a small generator that yields text and stores the usage on the side:</p>
+<pre><code class="language-python">def text_and_usage(stream, box):
+    for chunk in stream:
+        if chunk.usage:
+            box[&quot;usage&quot;] = chunk.usage
+        if chunk.choices and chunk.choices[0].delta.content:
+            yield chunk.choices[0].delta.content
+</code></pre>
+<p>With <code>box = {}</code> passed in, <code>box["usage"].prompt_tokens</code> and <code>.completion_tokens</code> are available after <code>st.write_stream</code> returns. The <code>if chunk.choices</code> check matters: indexing <code>choices[0]</code> on the usage chunk raises an <code>IndexError</code>.</p>
+<h2>The orphaned user message</h2>
+<p>This is the bug most copies of the tutorial code have. The user's message is appended to history before the API call, and the assistant's reply is appended after it. If anything raises in between, the second append never runs.</p>
+<p>I tested two failures. In the first, the mock sent a few tokens and then an error event in the middle of the stream, and the SDK raised <code>openai.APIError: upstream died</code> from inside <code>st.write_stream</code>. In the second, the mock returned 429 with <code>Retry-After: 2</code>. The SDK made three attempts (the first retry about 2 seconds later) and then raised <code>RateLimitError</code>. Either way, Streamlit showed the traceback and history was left as <code>["user"]</code>. On the next turn, the request carried two user messages in a row, <code>["user", "user"]</code>. Whether a backend accepts that varies, and even when it does, the model now answers a question the user thinks failed.</p>
+<p>Wrap the call so a failed turn leaves history the way it was:</p>
+<pre><code class="language-python">from openai import APIError
+
+with st.chat_message(&quot;assistant&quot;):
+    box = {}
+    try:
+        stream = client.chat.completions.create(
+            model=MODEL,
+            messages=st.session_state.messages,
+            stream=True,
+            stream_options={&quot;include_usage&quot;: True},
+        )
+        reply = st.write_stream(text_and_usage(stream, box))
+    except APIError as e:
+        st.session_state.messages.pop()
+        st.error(f&quot;The model call failed: {e.message}&quot;)
+        st.stop()
+</code></pre>
+<p><code>APIError</code> is the base class for the connection, timeout and HTTP status errors the SDK raises, so this one clause covers all of them. With this in place, the mid-stream failure showed an error box, history went back to empty, and the next turn sent a single clean user message.</p>
+<h2>Reasoning models and think tags</h2>
+<p>Some models served through compatible endpoints put their reasoning inline as <code>&lt;think&gt;...&lt;/think&gt;</code> at the start of <code>content</code>. The tags came through <code>st.write_stream</code> as ordinary text and, in the original code, went straight into history, so every later turn resent the reasoning as part of the assistant's message. Stripping them before saving is enough:</p>
+<pre><code class="language-python">import re
+reply = re.sub(r&quot;&lt;think&gt;.*?&lt;/think&gt;\s*&quot;, &quot;&quot;, reply, flags=re.S)
+st.session_state.messages.append({&quot;role&quot;: &quot;assistant&quot;, &quot;content&quot;: reply})
+</code></pre>
+<p>The user still sees the reasoning stream past once, which some people like. Hiding it while streaming needs a stateful filter in the generator, because a tag can be split across chunks.</p>
+<h2>Testing it without a browser</h2>
+<p>All of the above came from <code>streamlit.testing.v1.AppTest</code>, which runs the script headlessly and lets you submit chat input:</p>
+<pre><code class="language-python">from streamlit.testing.v1 import AppTest
+
+at = AppTest.from_file(&quot;app.py&quot;, default_timeout=30)
+at.run()
+at.chat_input[0].set_value(&quot;hello&quot;).run()
+assert not at.exception
+assert [m[&quot;role&quot;] for m in at.session_state.messages] == [&quot;user&quot;, &quot;assistant&quot;]
+</code></pre>
+<p>It reads <code>.streamlit/secrets.toml</code> from the working directory, so pointing <code>OPENAI_BASE_URL</code> at a local mock in a test copy of that file gives you a repeatable test for the failure paths. That test is how I found the orphaned-message bug in my own app.</p>
+<h2>Checklist</h2>
+<ol>
+<li>Base URL ends in <code>/v1</code>. Pass it and the key to <code>OpenAI()</code> explicitly.</li>
+<li>Remember that root-level secrets are exported to <code>os.environ</code> on first access.</li>
+<li>Put the shared client in <code>@st.cache_resource</code>, never a per-user one.</li>
+<li>Wrap <code>st.write_stream</code> in a generator if you want usage, and guard <code>choices</code>.</li>
+<li>Pop the user message when the call fails.</li>
+<li>Strip inline reasoning before saving history.</li>
+</ol>
+<p><em>Disclosure: I build <a href="https://apiclaw.biz">APIClaw</a>, the OpenAI-compatible gateway used in these examples (flat monthly plans; crypto on the site, other payment methods through support). Everything above applies to any compatible endpoint.</em></p>
+</div>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/anchor-js/4.1.0/anchor.min.js" integrity="sha256-lZaRhKri35AyJSypXXs4o6OPFTbTmUoltBbDCbdzegg=" crossorigin="anonymous"></script>
+    <script>anchors.add();</script>
+
+
+</body>
+</html>
