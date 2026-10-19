@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en-US">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+<!-- Begin Jekyll SEO tag v2.8.0 -->
+<title>Hugging Face InferenceClient on a Custom OpenAI-Compatible API: Auto /v1, model=&quot;dummy&quot; and Zero Retries</title>
+<meta property="og:title" content="Hugging Face InferenceClient on a Custom OpenAI-Compatible API: Auto /v1, model=&quot;dummy&quot; and Zero Retries">
+<meta name="description" content="InferenceClient 2.2 accepts base_url like the OpenAI client, but URL joining, the body model field and retries are different. I logged every request against a local mock.">
+<meta property="og:description" content="InferenceClient 2.2 accepts base_url like the OpenAI client, but URL joining, the body model field and retries are different. I logged every request against a local mock.">
+<meta property="og:locale" content="en_US">
+<link rel="canonical" href="https://ankita37105.github.io/llm-api-cost-notes/huggingface-inferenceclient-custom-openai-compatible-base-url.html">
+<meta property="og:url" content="https://ankita37105.github.io/llm-api-cost-notes/huggingface-inferenceclient-custom-openai-compatible-base-url.html">
+<meta property="og:site_name" content="llm-api-cost-notes">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary">
+<meta property="twitter:title" content="Hugging Face InferenceClient on a Custom OpenAI-Compatible API: Auto /v1, model=&quot;dummy&quot; and Zero Retries">
+<!-- End Jekyll SEO tag -->
+
+    <link rel="stylesheet" href="/llm-api-cost-notes/assets/css/style.css">
+    <!-- start custom head snippets, customize with your own _includes/head-custom.html file -->
+
+<!-- Setup Google Analytics -->
+
+
+
+<!-- You can set your favicon here -->
+<!-- link rel="shortcut icon" type="image/x-icon" href="/llm-api-cost-notes/favicon.ico" -->
+
+<!-- end custom head snippets -->
+
+  </head>
+  <body>
+    <div class="container-lg px-3 my-5 markdown-body">
+
+      <h1>Hugging Face InferenceClient on a Custom OpenAI-Compatible API: Auto /v1, model=&quot;dummy&quot; and Zero Retries</h1>
+<p><code>huggingface_hub.InferenceClient</code> is mostly known for Hub models and HF Inference Providers. It also ships an OpenAI-shaped surface: pass <code>base_url</code> and <code>api_key</code>, then call <code>client.chat.completions.create(...)</code> or <code>client.chat_completion(...)</code>. That is enough to hit any server that speaks <code>POST /v1/chat/completions</code>. The defaults are not the same as the official OpenAI Python SDK, and a few of them are easy to miss.</p>
+<p>I installed <code>huggingface_hub</code> 2.2.0 on Python 3.13.5 and pointed InferenceClient at a local mock of <code>POST /v1/chat/completions</code>. The mock logged the path, <code>Authorization</code>, <code>User-Agent</code> and full JSON body of every call, and could return 429, 503, 401 or 400 on demand. Everything below is what went over the wire. The examples use APIClaw, an OpenAI-compatible gateway I build, so weigh my opinions with that in mind. Its base URL is <code>https://apiclaw.biz/v1</code>. Replace <code>YOUR_MODEL_ID</code> with an exact ID from your provider's model list — do not invent one.</p>
+<h2>The minimal client</h2>
+<pre><code class="language-python">import os
+from huggingface_hub import InferenceClient
+
+client = InferenceClient(
+    base_url=&quot;https://apiclaw.biz/v1&quot;,
+    api_key=os.environ[&quot;APICLAW_API_KEY&quot;],
+)
+
+r = client.chat_completion(
+    messages=[{&quot;role&quot;: &quot;user&quot;, &quot;content&quot;: &quot;Say hi&quot;}],
+    model=&quot;YOUR_MODEL_ID&quot;,
+)
+print(r.choices[0].message.content)
+</code></pre>
+<p>Install with <code>pip install huggingface_hub</code>. The OpenAI-compatible alias works the same way:</p>
+<pre><code class="language-python">r = client.chat.completions.create(
+    model=&quot;YOUR_MODEL_ID&quot;,
+    messages=[{&quot;role&quot;: &quot;user&quot;, &quot;content&quot;: &quot;Say hi&quot;}],
+)
+</code></pre>
+<p><code>api_key</code> is an alias for <code>token</code>. Passing both to <code>__init__</code> raises <code>ValueError</code>. Same for <code>model</code> and <code>base_url</code>: you may pass only one. <code>base_url</code> is stored in <code>self.model</code> so the constructor stays OpenAI-shaped; the chat payload still needs its own <code>model=</code> argument (see below).</p>
+<p>Authorization on the wire was <code>Bearer sk-test</code> (whatever string you passed). The <code>User-Agent</code> included <code>hf_hub/2.2.0</code>. If you omit <code>api_key</code>/<code>token</code>, InferenceClient falls back to <code>HF_TOKEN</code> / the Hub cache via <code>get_token()</code>. It does <strong>not</strong> read <code>OPENAI_API_KEY</code>.</p>
+<h2>URL joining: InferenceClient inserts /v1 for you</h2>
+<p>This is the biggest difference from the OpenAI SDK. InferenceClient's chat path goes through <code>_build_chat_completion_url</code>. Against my mock:</p>
+<ul>
+<li><code>base_url=&quot;http://127.0.0.1:PORT/v1&quot;</code> → <code>POST /v1/chat/completions</code></li>
+<li><code>base_url=&quot;http://127.0.0.1:PORT/v1/&quot;</code> → <code>POST /v1/chat/completions</code></li>
+<li><code>base_url=&quot;http://127.0.0.1:PORT&quot;</code> (no <code>/v1</code>) → <code>POST /v1/chat/completions</code></li>
+<li><code>base_url=&quot;http://127.0.0.1:PORT/v1/chat/completions&quot;</code> → left as-is</li>
+<li><code>base_url=&quot;http://127.0.0.1:PORT/api&quot;</code> → <code>POST /api/v1/chat/completions</code></li>
+</ul>
+<p>The OpenAI Python client (3.35.1, same box) does the opposite on a bare host: <code>base_url=&quot;http://127.0.0.1:PORT&quot;</code> hit <code>POST /chat/completions</code> with no <code>/v1</code>. InferenceClient adds <code>/v1/chat/completions</code> when the path is empty, and appends only <code>/chat/completions</code> when the path already ends in <code>/v1</code>.</p>
+<p>So for a normal OpenAI-compatible gateway you can pass either <code>https://apiclaw.biz/v1</code> or <code>https://apiclaw.biz</code> and land on the right route. That is forgiving. The <code>/api</code> case is the footgun: any non-empty path that is not <code>/v1</code> and not already <code>/chat/completions</code> gets <code>/v1/chat/completions</code> glued on. A reverse proxy mounted at <code>/api</code> will see <code>/api/v1/chat/completions</code>, which is rarely what you configured.</p>
+<p><code>InferenceClient(model=&quot;http://.../v1&quot;)</code> (URL as the positional <code>model</code>, no <code>base_url</code>) behaved the same for chat: the conversational helper still runs <code>_build_chat_completion_url</code>. The constructor docstring says a URL passed as <code>model</code> will not get a suffix; for <code>chat_completion</code> that is outdated — the suffix is added.</p>
+<h2>Forgetting model= sends model="dummy"</h2>
+<p><code>base_url</code> in <code>__init__</code> only sets the URL. The JSON body still needs a model id. The call-site <code>model=</code> argument fills the payload. If you leave it out, the helper sees that the only "model" it has is a URL and substitutes the string <code>&quot;dummy&quot;</code>:</p>
+<pre><code class="language-python"># base_url set, no model= in the call
+client.chat_completion(messages=[{&quot;role&quot;: &quot;user&quot;, &quot;content&quot;: &quot;hi&quot;}])
+# mock body: {&quot;model&quot;: &quot;dummy&quot;, &quot;messages&quot;: [...], &quot;stream&quot;: false}
+</code></pre>
+<p>With <code>model=&quot;YOUR_MODEL_ID&quot;</code> the body carried that id exactly. Always pass <code>model=</code> on every <code>chat_completion</code> / <code>chat.completions.create</code> when you constructed the client with <code>base_url</code>.</p>
+<h2>What the body actually contains</h2>
+<p>A minimal successful call sent three fields:</p>
+<ul>
+<li><code>model</code>: <code>YOUR_MODEL_ID</code></li>
+<li><code>messages</code>: the list you passed</li>
+<li><code>stream</code>: <code>false</code></li>
+</ul>
+<p>Unlike the OpenAI SDK, InferenceClient always includes <code>&quot;stream&quot;: false</code> on non-streaming calls. <code>filter_none</code> drops <code>None</code> values but keeps <code>False</code>, and <code>stream</code> defaults to <code>False</code> in the signature. <code>temperature</code>, <code>max_tokens</code>, <code>top_p</code> and friends appeared only when I set them. The docstring mentions a default of 100 for <code>max_tokens</code>; that default is not sent on the wire — omitting the argument omits the field.</p>
+<p>A system message went through unchanged as the first element of <code>messages</code>. Streaming set <code>&quot;stream&quot;: true</code> and returned an iterable of chunk objects; my five-token mock produced five content deltas (<code>&quot;Hello&quot;</code>, <code>&quot; &quot;</code>, <code>&quot;from&quot;</code>, <code>&quot; &quot;</code>, <code>&quot;HF&quot;</code>).</p>
+<h2>Retries: there are none</h2>
+<p>The OpenAI Python client defaults to <code>max_retries=2</code> (up to three attempts) and honors <code>Retry-After</code>. InferenceClient's <code>_inner_post</code> does a single <code>httpx</code> POST and raises. Against the mock:</p>
+<ul>
+<li>Persistent 429 → one request, ~0.001s, <code>HfHubHTTPError</code> with status 429</li>
+<li>Persistent 503 → one request, <code>HfHubHTTPError</code> 503</li>
+<li>401 / 400 → one request each, <code>HfHubHTTPError</code></li>
+</ul>
+<p>No <code>x-stainless-retry-count</code> header (that is an OpenAI SDK thing). No second try. If you want retries against a flaky gateway, wrap the call yourself or use the OpenAI client with the same <code>base_url</code>. Fail-fast is the InferenceClient default; that is useful when you already have an outer retry loop and do not want them to stack.</p>
+<h2>Errors and when to prefer the OpenAI client</h2>
+<p>Every failure I forced came back as <code>huggingface_hub.errors.HfHubHTTPError</code>, not the typed <code>RateLimitError</code> / <code>AuthenticationError</code> / <code>BadRequestError</code> hierarchy from <code>openai</code>. The HTTP status is on the exception (<code>e.response.status_code</code> when a response object is attached). That is fine for a script that logs and exits; it is awkward if your existing middleware already catches OpenAI SDK exceptions.</p>
+<p>I also checked a wrong path on purpose. Pointing <code>base_url</code> at a host that only serves <code>/v1/chat/completions</code> but sending traffic to <code>/api/v1/chat/completions</code> (the <code>/api</code> footgun above) produced a 404 from the mock with a single attempt. There is no helpful "did you mean /v1?" message from InferenceClient — you have to log the URL yourself.</p>
+<p>If you already depend on OpenAI retries, typed errors, or <code>max_retries=0</code> for fail-fast with the same exception types elsewhere in the app, keep using <code>openai.OpenAI(base_url=..., api_key=...)</code>. Use InferenceClient when you want one dependency that already talks to the Hub and also needs an occasional OpenAI-compatible chat call, and you are willing to add your own retry wrapper.</p>
+<h2>Checklist</h2>
+<ul>
+<li>Construct with <code>base_url=&quot;https://apiclaw.biz/v1&quot;</code> and <code>api_key=...</code> (or <code>token=...</code>), not both <code>model</code> and <code>base_url</code>.</li>
+<li>Always pass <code>model=&quot;YOUR_MODEL_ID&quot;</code> on the chat call, or the body gets <code>&quot;dummy&quot;</code>.</li>
+<li>Bare host and <code>/v1</code> both resolve to <code>/v1/chat/completions</code>; a random path prefix like <code>/api</code> becomes <code>/api/v1/chat/completions</code>.</li>
+<li>Expect <code>&quot;stream&quot;: false</code> in every non-streaming body.</li>
+<li>Do not count on automatic 429/503 retries — there is one attempt.</li>
+<li><code>HF_TOKEN</code> is the env fallback; <code>OPENAI_API_KEY</code> is ignored.</li>
+<li><code>client.chat.completions.create(...)</code> is an alias for <code>chat_completion</code>; inputs and outputs match.</li>
+</ul>
+<p><em>Disclosure: I build <a href="https://apiclaw.biz">APIClaw</a>, the OpenAI-compatible gateway used in these examples (flat monthly plans; crypto on the site, other payment methods through support). Everything above applies to any compatible endpoint.</em></p>
+
+</div>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/anchor-js/4.1.0/anchor.min.js" integrity="sha256-lZaRhKri35AyJSypXXs4o6OPFTbTmUoltBbDCbdzegg=" crossorigin="anonymous"></script>
+    <script>anchors.add();</script>
+
+
+</body>
+</html>
