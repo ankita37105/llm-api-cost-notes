@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en-US">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+<!-- Begin Jekyll SEO tag v2.8.0 -->
+<title>Flat-Rate LLM API for a Small Team: Per-Seat Plans vs One Pooled Request Allowance</title>
+<meta property="og:title" content="Flat-Rate LLM API for a Small Team: Per-Seat Plans vs One Pooled Request Allowance">
+<meta name="description" content="Claude Team, Claude Enterprise, Cursor Teams and GitHub Copilot priced per seat, compared with sharing one gateway plan across three to six developers.">
+<meta property="og:description" content="Claude Team, Claude Enterprise, Cursor Teams and GitHub Copilot priced per seat, compared with sharing one gateway plan across three to six developers.">
+<meta property="og:locale" content="en_US">
+<link rel="canonical" href="https://ankita37105.github.io/llm-api-cost-notes/flat-rate-llm-api-small-team-per-seat-vs-pooled-plan.html">
+<meta property="og:url" content="https://ankita37105.github.io/llm-api-cost-notes/flat-rate-llm-api-small-team-per-seat-vs-pooled-plan.html">
+<meta property="og:site_name" content="llm-api-cost-notes">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary">
+<meta property="twitter:title" content="Flat-Rate LLM API for a Small Team: Per-Seat Plans vs One Pooled Request Allowance">
+<!-- End Jekyll SEO tag -->
+
+    <link rel="stylesheet" href="/llm-api-cost-notes/assets/css/style.css">
+    <!-- start custom head snippets, customize with your own _includes/head-custom.html file -->
+
+<!-- Setup Google Analytics -->
+
+
+
+<!-- You can set your favicon here -->
+<!-- link rel="shortcut icon" type="image/x-icon" href="/llm-api-cost-notes/favicon.ico" -->
+
+<!-- end custom head snippets -->
+
+  </head>
+  <body>
+    <div class="container-lg px-3 my-5 markdown-body">
+
+      <h1>Flat-Rate LLM API for a Small Team: Per-Seat Plans vs One Pooled Request Allowance</h1>
+<p>Small teams ask me this all the time, because I build APIClaw, a flat-rate LLM gateway: "Do we buy a seat for every developer, or share one API plan?" Both are reasonable answers. They charge for different things, though. A seat pays for a person's access to a product. A pooled API plan pays for requests that any tool on the team can send. Here's how the numbers fall out for a team of four, using each vendor's live pricing page.</p>
+<h2>Per-seat prices (prices checked Oct 2026)</h2>
+<table>
+<thead>
+<tr>
+<th>Product</th>
+<th>Price per seat</th>
+<th>What's included</th>
+<th>Source</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Claude Team, Standard seat</td>
+<td>$25/month monthly, $20 annually</td>
+<td>Claude apps, Claude Code, more usage than Pro</td>
+<td>claude.com/pricing</td>
+</tr>
+<tr>
+<td>Claude Team, Premium seat</td>
+<td>$125/month monthly, $100 annually</td>
+<td>5x the usage of a standard seat</td>
+<td>claude.com/pricing</td>
+</tr>
+<tr>
+<td>Claude Enterprise (self-serve)</td>
+<td>$20/seat/month annually, plus usage at API rates</td>
+<td>20-seat minimum, SCIM, audit logs</td>
+<td>claude.com/pricing</td>
+</tr>
+<tr>
+<td>Cursor Teams</td>
+<td>$30+/user/month</td>
+<td>Cursor editor; third-party models billed at API list price</td>
+<td>cursor.com/pricing</td>
+</tr>
+<tr>
+<td>GitHub Copilot Pro</td>
+<td>$10/month</td>
+<td>$15 in AI Credits ($10 base + $5 flex)</td>
+<td>github.com/features/copilot/plans</td>
+</tr>
+<tr>
+<td>GitHub Copilot Pro+</td>
+<td>$39/month</td>
+<td>$70 in AI Credits ($39 base + $31 flex)</td>
+<td>github.com/features/copilot/plans</td>
+</tr>
+</tbody>
+</table>
+<p>Claude Team is for 2 to 150 people. I left out Copilot Business and Enterprise because their prices weren't shown on the plans page when I checked.</p>
+<h2>The pooled option (prices checked Oct 2026)</h2>
+<p>APIClaw sells one account with a daily request allowance. The allowance resets at 00:00 UTC, there's no per-token billing, and you can create multiple scoped API keys, so each developer or tool gets its own key with its own usage log.</p>
+<table>
+<thead>
+<tr>
+<th>Plan</th>
+<th>Price</th>
+<th>Requests/day</th>
+<th>How the plan page describes it</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Ultimate</td>
+<td>$69/mo</td>
+<td>3,000</td>
+<td>"Room to share one gateway with a teammate"</td>
+</tr>
+<tr>
+<td>Ultimate Plus</td>
+<td>$89/mo</td>
+<td>4,000</td>
+<td>"Share one account across a small team"</td>
+</tr>
+<tr>
+<td>Ultimate Pro</td>
+<td>$99/mo</td>
+<td>6,000</td>
+<td></td>
+</tr>
+<tr>
+<td>Ultimate Max</td>
+<td>$129/mo</td>
+<td>8,000</td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<p>Above 8,000 requests a day there's a Custom plan with separate API keys per team or project and an SLA option.</p>
+<h2>A team of four, worked through</h2>
+<p>These are assumptions for illustration. Use your own seat count and usage.</p>
+<ul>
+<li><strong>Claude Team, standard seats, billed monthly:</strong> 4 × $25 = $100/month.</li>
+<li><strong>Claude Team, premium seats, billed monthly:</strong> 4 × $125 = $500/month.</li>
+<li><strong>Cursor Teams:</strong> 4 × $30 = $120/month and up. Third-party model usage is billed at API list price on top.</li>
+<li><strong>Copilot Pro+ for each developer:</strong> 4 × $39 = $156/month.</li>
+<li><strong>APIClaw Ultimate Plus, shared:</strong> $89/month for 4,000 requests/day across everyone, roughly 1,000 per person.</li>
+</ul>
+<p>The difference isn't only the total. Seats come with limits per person, so a quiet developer's unused quota can't help the busy one. A pooled allowance moves to whoever is working. That works well when one person is running agents all afternoon while the others review code.</p>
+<h2>When per-seat is the right choice</h2>
+<p>I'd tell a team to buy seats, not a gateway plan, when:</p>
+<ul>
+<li><strong>You want the product, not just the model.</strong> Claude's apps, projects, and connectors, Cursor's Tab completion, and Copilot's GitHub integration are product features. A gateway doesn't give you any of them. Cursor's Tab completion stays on Cursor's own models even when you add a custom key, and Composer won't run on a custom key.</li>
+<li><strong>You need admin and compliance features.</strong> SSO, SCIM, audit logs, data retention controls, and HIPAA-ready offerings belong to Claude Enterprise and similar plans. If your security review asks for these, buy them from the vendor.</li>
+<li><strong>You need official contracts.</strong> If you need an enterprise agreement with Anthropic or OpenAI directly, a gateway is the wrong layer.</li>
+<li><strong>Usage is light.</strong> At a few requests per person per day, a $10–$25 seat is the cheaper and simpler choice.</li>
+</ul>
+<h2>When a pooled plan is the right choice</h2>
+<ul>
+<li>The team mostly uses API-driven tools: Claude Code, Cline, Aider, scripts, CI agents.</li>
+<li>Usage is uneven between people, or it moves around week to week.</li>
+<li>You want one predictable bill that doesn't change with context size or token counts.</li>
+<li>You want to try several providers' models through one key. APIClaw routes to models from Anthropic, OpenAI, Google, Mistral, Meta, DeepSeek, Cohere, and xAI.</li>
+</ul>
+<h2>The honest downsides of pooling</h2>
+<ul>
+<li><strong>One cap for everyone.</strong> The daily allowance is shared. A runaway agent loop on one key can use up the day for the whole team, and once you're over quota, requests return an error until the reset. Watch per-key usage in the request logs.</li>
+<li><strong>Heavy models cost more allowance.</strong> Heavier models draw down the allowance faster than lighter ones, so an Opus-heavy team gets fewer effective requests than the headline number. Check the per-model figure in the dashboard.</li>
+<li><strong>No unlimited tier.</strong> If the team needs no cap at all, pay-per-token or a self-hosted proxy is the better shape.</li>
+<li><strong>Payment.</strong> Billing is crypto on the site, and other payment methods are available via support. Plans run in 30-day cycles with no auto-renewing contract. If finance needs card invoices from a big vendor, factor that in.</li>
+</ul>
+<h2>Switching one developer's tools</h2>
+<p>Give each developer their own scoped key. For OpenAI-format tools, the base URL is <code>https://apiclaw.biz/v1</code>. For Claude Code, which uses the Anthropic Messages format, use the root URL without <code>/v1</code>:</p>
+<pre><code class="language-json">{
+  &quot;env&quot;: {
+    &quot;ANTHROPIC_BASE_URL&quot;: &quot;https://apiclaw.biz&quot;,
+    &quot;ANTHROPIC_AUTH_TOKEN&quot;: &quot;THIS_DEVELOPERS_KEY&quot;,
+    &quot;ANTHROPIC_MODEL&quot;: &quot;YOUR_MODEL_ID&quot;,
+    &quot;CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC&quot;: &quot;1&quot;,
+    &quot;CLAUDE_CODE_ATTRIBUTION_HEADER&quot;: &quot;0&quot;
+  }
+}
+</code></pre>
+<p>For scripts and CI:</p>
+<pre><code class="language-bash">export OPENAI_BASE_URL=&quot;https://apiclaw.biz/v1&quot;
+export OPENAI_API_KEY=&quot;CI_SCOPED_KEY&quot;
+</code></pre>
+<p>Use a separate key for CI, so a broken pipeline shows up in its own log line instead of hiding inside someone's usage. Take model IDs from the model hub.</p>
+<h2>How I'd decide for a small team</h2>
+<ol>
+<li>List which tools each person actually uses. If it's mostly Cursor Tab, the Claude apps, or Copilot inside GitHub, buy seats.</li>
+<li>If it's mostly agents and scripts on the API, add up a typical day's requests across the team.</li>
+<li>Compare that total with a pooled allowance, and leave headroom for heavy models and bad days.</li>
+<li>Mixing is fine. Seats for the people who live in an editor product, plus one shared API plan for agents and CI.</li>
+</ol>
+<p>There's a free trial of 50 lifetime requests with no card, so you can test your team's tools before paying, at <a href="https://apiclaw.biz">apiclaw.biz</a>.</p>
+<p><em>Disclosure: I build APIClaw; this article was written with AI assistance and checked by me. Competitor prices checked Oct 2026.</em></p>
+</div>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/anchor-js/4.1.0/anchor.min.js" integrity="sha256-lZaRhKri35AyJSypXXs4o6OPFTbTmUoltBbDCbdzegg=" crossorigin="anonymous"></script>
+    <script>anchors.add();</script>
+
+
+</body>
+</html>
