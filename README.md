@@ -19,7 +19,7 @@ All prices are USD per 1M tokens, taken from each vendor's own pricing page:
 
 Some details that matter for agents:
 
-- **DeepSeek's off-peak rates are half the peak rates.** Peak is 01:00â€“04:00 and 06:00â€“10:00 UTC on weekdays, which is 06:30â€“09:30 and 11:30â€“15:30 here in India. Weekends are off-peak all day.
+- **DeepSeek's off-peak rates are half the peak rates.** Peak is 01:00–04:00 and 06:00–10:00 UTC on weekdays, which is 06:30–09:30 and 11:30–15:30 here in India. Weekends are off-peak all day.
 - **Qwen3.8-Max costs less outside Singapore.** Alibaba lists $1.65 input and $4.951 output in its Global-scope regions. I used the International price above because that's what most non-China accounts default to.
 - **Reasoning tokens are billed as output.** Alibaba's table literally says "chain of thought + answer". If you leave thinking mode on, which is DeepSeek's default, your output token count is much bigger than the visible reply.
 
@@ -35,8 +35,8 @@ Take one typical "fix this failing test" run in an agent like Cline or Claude Co
 That gives:
 
 ```text
-input  = sum(15,000 + 3,000 Ã— n) for n = 0..24 = 1,275,000 tokens
-output = 25 Ã— 1,500                            =    37,500 tokens
+input  = sum(15,000 + 3,000 × n) for n = 0..24 = 1,275,000 tokens
+output = 25 × 1,500                            =    37,500 tokens
 ```
 
 Look at the ratio. **Input is 97% of the tokens.** In agent loops, the input price and the cache-hit price decide the bill, not the output price.
@@ -60,7 +60,7 @@ def task_cost(miss, hit, out, cached_share):
 | GLM-5.3 | $1.95 | $0.60 |
 | GLM-5.3-Flash | $0.21 | $0.07 |
 
-Caching alone changes the per-task cost by 3â€“6x. The difference between "DeepSeek vs Qwen vs GLM" is smaller than the difference between "cached vs not cached" for any one of them.
+Caching alone changes the per-task cost by 3–6x. The difference between "DeepSeek vs Qwen vs GLM" is smaller than the difference between "cached vs not cached" for any one of them.
 
 ## Scaling to a month
 
@@ -88,10 +88,10 @@ For several vendors behind one key, my own gateway counts **requests per day** i
 
 | Model | Weighted requests/day | Flat plan needed | Per-token range (month) |
 |---|---|---|---|
-| DeepSeek V4 Pro | 300 | $19 (500/day) | $42â€“$484 |
-| Qwen3.8-Max | 600 | $39 (1,000/day) | $184â€“$733 |
-| GLM-5.3 | 600 | $39 (1,000/day) | $157â€“$515 |
-| GLM-5.3-Flash | 600 | $39 (1,000/day) | $18â€“$55 |
+| DeepSeek V4 Pro | 300 | $19 (500/day) | $42–$484 |
+| Qwen3.8-Max | 600 | $39 (1,000/day) | $184–$733 |
+| GLM-5.3 | 600 | $39 (1,000/day) | $157–$515 |
+| GLM-5.3-Flash | 600 | $39 (1,000/day) | $18–$55 |
 
 Read honestly, that table says:
 
@@ -105,3 +105,24 @@ Read honestly, that table says:
 Don't trust my 25 calls and 3,000 tokens per turn. Your agent, repo and habits will be different. Most agents and gateways log token usage per request. Take one real day, add up the cache-miss, cache-hit and output tokens per model, multiply by the table at the top, and count your calls. If your monthly per-token estimate is under about $20, stay per-token. If it's well above your flat-plan price, or it swings a lot from week to week, the flat meter is probably the better fit.
 
 *Disclosure: I build [APIClaw](https://apiclaw.biz), the request-based gateway mentioned above. Vendor prices are from their official pricing pages as of October 2026, and vendors change prices, so recheck them before relying on these numbers.*
+
+## All notes on this site
+
+Direct answers:
+
+- [Flat-rate Claude API: fixed monthly price instead of per-token billing](flat-rate-claude-api.html)
+- [Unlimited GPT API subscription: what actually exists](unlimited-gpt-api-subscription.html)
+- [Cheapest API for Claude Code: per-token vs subscription vs flat-rate](cheapest-api-for-claude-code.html)
+- [OpenRouter alternative with a fixed monthly price](openrouter-alternative-fixed-price.html)
+- [Gemini and Claude with one API key at a flat monthly price](gemini-and-claude-one-api-key-flat-monthly.html)
+- [AI API you can pay for with crypto](ai-api-crypto-payment.html)
+
+Guides:
+
+- [Codex CLI with a third-party OpenAI-compatible endpoint](codex-cli-custom-provider.html)
+- [Flat-rate LLM API for a small team: per-seat vs pooled plan](flat-rate-llm-api-small-team-per-seat-vs-pooled-plan.html)
+- [Rust async-openai with a custom base URL](rust-async-openai-custom-base-url.html)
+- [Ruby OpenAI clients with a compatible base URL](ruby-openai-compatible-base-url.html)
+- [Streamlit chat app on an OpenAI-compatible API](streamlit-chat-app-openai-compatible-api.html)
+- [Jupyter AI magics with an OpenAI-compatible API](jupyter-ai-magics-openai-compatible-api.html)
+- [Hugging Face InferenceClient with a custom OpenAI-compatible base URL](huggingface-inferenceclient-custom-openai-compatible-base-url.html)
