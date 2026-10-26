@@ -108,6 +108,11 @@ Don't trust my 25 calls and 3,000 tokens per turn. Your agent, repo and habits w
 
 ## All notes on this site
 
+Tools:
+
+- [LLM API Cost Calculator for Coding Agents](calculator.html): monthly cost on Anthropic/OpenAI list prices, OpenRouter, Claude Pro/Max and request-based plans
+- [Awesome flat-rate LLM APIs](https://github.com/ankita37105/awesome-flat-rate-llm-apis): sourced list of flat-rate and request-based providers
+
 Direct answers:
 
 - [Flat-rate Claude API: fixed monthly price instead of per-token billing](flat-rate-claude-api.html)

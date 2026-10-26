@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LLM API Cost Calculator for Coding Agents (Claude, GPT): Per-Token vs Flat-Rate | llm-api-cost-notes</title>
+<meta name="description" content="Free calculator: monthly cost of a coding agent on Anthropic and OpenAI list prices, OpenRouter (+5.5% fee), Claude Pro/Max and flat-rate APIClaw plans. Enter requests/day, tokens and cache-hit rate.">
+<link rel="canonical" href="https://ankita37105.github.io/llm-api-cost-notes/calculator.html">
+<meta property="og:title" content="LLM API Cost Calculator for Coding Agents">
+<meta property="og:description" content="Per-token vs subscription vs flat-rate: what your coding agent really costs per month. Official list prices, with sources.">
+<meta property="og:url" content="https://ankita37105.github.io/llm-api-cost-notes/calculator.html">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary">
+<style>
+:root{--fg:#1f2328;--mut:#59636e;--bd:#d1d9e0;--bg2:#f6f8fa;--acc:#0969da;--ok:#1a7f37;--warn:#9a6700}
+*{box-sizing:border-box}body{margin:0;font:16px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;color:var(--fg)}
+main{max-width:920px;margin:0 auto;padding:20px 16px 60px}h1{font-size:1.7em;line-height:1.25;margin:.2em 0 .4em}h2{margin-top:1.8em;border-bottom:1px solid var(--bd);padding-bottom:.25em}
+a{color:var(--acc)}.mut{color:var(--mut);font-size:.92em}.box{background:var(--bg2);border:1px solid var(--bd);border-radius:8px;padding:14px 16px;margin:14px 0}
+form{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}label{display:flex;flex-direction:column;font-weight:600;font-size:.92em}
+input,select{margin-top:4px;font:inherit;padding:8px 10px;border:1px solid var(--bd);border-radius:6px;background:#fff;width:100%}
+table{border-collapse:collapse;width:100%;margin:10px 0;font-size:.95em}th,td{border:1px solid var(--bd);padding:7px 9px;text-align:left;vertical-align:top}th{background:var(--bg2)}
+td.n{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}.best{background:#dafbe1}.scroll{overflow-x:auto}
+button{font:inherit;padding:8px 14px;border-radius:6px;border:1px solid var(--bd);background:#fff;cursor:pointer}button.p{background:var(--acc);color:#fff;border-color:var(--acc)}
+#verdict{font-size:1.05em}.warn{color:var(--warn)}code{background:var(--bg2);padding:1px 5px;border-radius:4px;font-size:.9em}
+@media (max-width:560px){h1{font-size:1.35em}th,td{padding:6px}}
+</style>
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"WebApplication","name":"LLM API Cost Calculator for Coding Agents","url":"https://ankita37105.github.io/llm-api-cost-notes/calculator.html","applicationCategory":"DeveloperApplication","operatingSystem":"Any (runs in the browser)","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"publisher":{"@type":"Organization","name":"APIClaw","url":"https://apiclaw.biz"},"dateModified":"2026-10-26"}
+</script>
+<script type="application/ld+json">
+{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "How much does a coding agent cost per month on the Claude API?", "acceptedAnswer": {"@type": "Answer", "text": "Multiply requests per day by tokens per request and the list price. Example: 300 requests/day with 30,000 input tokens (60% cached) and 1,000 output tokens on Claude Sonnet 5.5 at $2 input, $0.20 cache read and $10 output per million tokens is about $0.0376 per request, or roughly $338/month over 30 days, before cache-write surcharges."}}, {"@type": "Question", "name": "Is a flat-rate LLM API cheaper than paying per token?", "acceptedAnswer": {"@type": "Answer", "text": "Only above a certain volume. At low volume (a few dozen modest calls a day) per-token billing is often under $19/month and is the cheaper choice. For agent workloads that re-send large contexts hundreds of times a day, a flat plan such as APIClaw's $19 to $129/month tiers usually costs less. The calculator shows which side of the line you are on."}}, {"@type": "Question", "name": "What is a request weight?", "acceptedAnswer": {"@type": "Answer", "text": "APIClaw counts heavier models as more than one request against your daily quota. According to APIClaw's public model list, Claude Sonnet 5.5 has a weight of 2, Claude Opus 5.5, Claude Fable 5.1 and GPT-6 Sol a weight of 3, and DeepSeek V4 Pro a weight of 1."}}, {"@type": "Question", "name": "How does OpenRouter pricing compare?", "acceptedAnswer": {"@type": "Answer", "text": "OpenRouter bills the provider's list price per token and charges a 5.5% fee when you buy credits on the Standard plan (8% on Business), so it costs slightly more than going direct for the same model and tokens."}}, {"@type": "Question", "name": "Can Claude Pro or Max replace API spend for Claude Code?", "acceptedAnswer": {"@type": "Answer", "text": "Often, yes, for individual use: Claude Code is included in Pro ($20/month) and Max ($100 or $200/month), with usage limits on a rolling 5-hour window plus weekly limits. Anthropic doesn't publish those limits as request counts, so the calculator can't tell you whether your workload fits."}}, {"@type": "Question", "name": "Who made this calculator?", "acceptedAnswer": {"@type": "Answer", "text": "The APIClaw team. APIClaw is one of the options compared; all other prices come from official pricing pages linked on this page."}}]}
+</script>
+</head>
+<body><main>
+<p class="mut"><a href="./">llm-api-cost-notes</a> / calculator</p>
+<h1>LLM API Cost Calculator for Coding Agents</h1>
+<p>Estimate what a coding agent (Claude Code, Cursor, Cline, Aider, Codex and similar) costs per month at <strong>official per-token list prices</strong> (Anthropic, OpenAI), through <strong>OpenRouter</strong>, on a <strong>Claude Pro/Max</strong> subscription, and on <strong>flat-rate APIClaw</strong> plans. Everything runs in your browser; nothing is sent anywhere.</p>
+<p class="mut"><strong>Disclosure:</strong> this calculator is built and maintained by the APIClaw team, and APIClaw is one of the options compared. Every competitor price below is copied from the vendor's own pricing page and linked. Prices checked 2026-10-26. If anything is wrong, <a href="https://github.com/ankita37105/llm-api-cost-notes/issues">open an issue</a>.</p>
+
+<div class="box">
+<form id="f" onsubmit="return false">
+<label>Model<select id="m"></select></label>
+<label>Requests per day<input id="r" type="number" min="1" step="1" value="300"></label>
+<label>Avg input tokens per request<input id="i" type="number" min="0" step="100" value="30000"></label>
+<label>Avg output tokens per request<input id="o" type="number" min="0" step="50" value="1000"></label>
+<label>Cache-hit % of input<input id="c" type="number" min="0" max="100" step="5" value="60"></label>
+<label>Days per month<input id="d" type="number" min="1" max="31" step="1" value="30"></label>
+</form>
+<p style="margin:12px 0 0"><button class="p" id="share">Copy shareable link</button> <span id="copied" class="mut"></span></p>
+</div>
+
+<p id="verdict"></p>
+<div class="scroll"><table id="out"><thead><tr><th>Option</th><th>How it bills</th><th>Monthly cost</th><th>Notes</th></tr></thead><tbody></tbody></table></div>
+<p class="mut">Per-token rows: input tokens that hit the cache are priced at the cache-read rate and the rest at the normal input rate. Cache-write surcharges, batch discounts, tool fees, long-context premiums on Anthropic and taxes are not included, so real per-token bills for agents are usually a little <em>higher</em> than shown. Agents often make several API calls per user prompt; enter API calls, not chat messages.</p>
+
+<h2>When per-token is cheaper (honest note)</h2>
+<ul>
+<li><strong>Low volume.</strong> If you make a few dozen modest calls a day, per-token billing often comes in under $19/month. The calculator says so when it happens.</li>
+<li><strong>High cache-hit, small outputs.</strong> Cache reads cost 10% or less of normal input on Anthropic and OpenAI, so a well-cached workload can be much cheaper than its uncached price.</li>
+<li><strong>Bursty months.</strong> A flat plan bills you even in weeks you don't code. Pay-as-you-go doesn't.</li>
+<li><strong>You already pay for Claude Pro/Max.</strong> If Claude Code fits inside your plan's 5-hour and weekly limits, extra API spend may be unnecessary. Max also includes $100 or $200/month of Claude Platform API credits.</li>
+</ul>
+
+<h2>Prices used (official sources)</h2>
+<div class="scroll"><table>
+<tr><th>Model</th><th>Input / MTok</th><th>Cached input (read) / MTok</th><th>Output / MTok</th><th>Source</th></tr>
+<tr><td>Claude Sonnet 5.5</td><td class="n">$2.00</td><td class="n">$0.20</td><td class="n">$10.00</td><td><a href="https://claude.com/pricing">claude.com/pricing</a></td></tr>
+<tr><td>Claude Opus 5.5</td><td class="n">$4.00</td><td class="n">$0.20</td><td class="n">$20.00</td><td><a href="https://claude.com/pricing">claude.com/pricing</a></td></tr>
+<tr><td>Claude Fable 5.1</td><td class="n">$10.00</td><td class="n">$0.25</td><td class="n">$50.00</td><td><a href="https://claude.com/pricing">claude.com/pricing</a></td></tr>
+<tr><td>GPT-6 Sol (≤272K input)</td><td class="n">$2.00</td><td class="n">$0.20</td><td class="n">$10.00</td><td><a href="https://platform.openai.com/docs/pricing">platform.openai.com/docs/pricing</a></td></tr>
+<tr><td>GPT-6 Sol (&gt;272K input)</td><td class="n">$4.00</td><td class="n">$0.40</td><td class="n">$15.00</td><td><a href="https://platform.openai.com/docs/pricing">platform.openai.com/docs/pricing</a></td></tr>
+</table></div>
+<p class="mut">Claude Sonnet 5.5's cache-read rate is not legible on the pricing card as fetched; the calculator uses $0.20/MTok, the same as Opus 5.5 and 10% of Sonnet input, consistent with Anthropic's other models. OpenRouter: provider list price per token plus a 5.5% fee on credit purchases (Standard; 8% on Business), <a href="https://openrouter.ai/pricing">openrouter.ai/pricing</a>. Claude Pro $20/month (or $17/month billed annually), Max 5x $100/month, Max 20x $200/month: <a href="https://claude.com/pricing">claude.com/pricing</a> and <a href="https://support.claude.com/en/articles/11049741-what-is-the-max-plan">Claude Help Center</a>. Anthropic does not publish request counts for these plans.</p>
+
+<h2>APIClaw plans and request weights</h2>
+<p>APIClaw bills by <strong>requests per day</strong>, not tokens. Heavier models count as more than one request (the "request weight"). The calculator multiplies your requests/day by the model's weight and picks the smallest plan that covers it. Plans from <a href="https://apiclaw.biz/public/plans">apiclaw.biz/public/plans</a>, weights from <a href="https://apiclaw.biz/public/model_hub">apiclaw.biz/public/model_hub</a>, both fetched 2026-10-26.</p>
+<div class="scroll"><table>
+<tr><th>Plan</th><th>Price</th><th>Weighted requests/day</th></tr>
+<tr><td>Plus</td><td class="n">$19/month</td><td class="n">500</td></tr>
+<tr><td>Pro</td><td class="n">$39/month</td><td class="n">1,000</td></tr>
+<tr><td>Max</td><td class="n">$59/month</td><td class="n">1,500</td></tr>
+<tr><td>Ultimate</td><td class="n">$69/month</td><td class="n">3,000</td></tr>
+<tr><td>Ultimate Plus</td><td class="n">$89/month</td><td class="n">4,000</td></tr>
+<tr><td>Ultimate Pro</td><td class="n">$99/month</td><td class="n">6,000</td></tr>
+<tr><td>Ultimate Max</td><td class="n">$129/month</td><td class="n">8,000</td></tr>
+<tr><td>Free trial</td><td class="n">$0</td><td class="n">50 requests total</td></tr>
+</table></div>
+<div class="scroll"><table>
+<tr><th>Model (APIClaw ID)</th><th>Request weight</th></tr>
+<tr><td><code>apiclaw/claude-fable-5-1</code></td><td class="n">3</td></tr>
+<tr><td><code>apiclaw/claude-opus-5-5</code></td><td class="n">3</td></tr>
+<tr><td><code>apiclaw/claude-sonnet-5-5</code></td><td class="n">2</td></tr>
+<tr><td><code>apiclaw/deepseek-v4-flash</code></td><td class="n">1</td></tr>
+<tr><td><code>apiclaw/deepseek-v4-flash-0731</code></td><td class="n">2</td></tr>
+<tr><td><code>apiclaw/deepseek-v4-pro</code></td><td class="n">1</td></tr>
+<tr><td><code>apiclaw/deepseek-v4-pro-0813</code></td><td class="n">2</td></tr>
+<tr><td><code>apiclaw/deepseek-v4.1-flash</code></td><td class="n">2</td></tr>
+<tr><td><code>apiclaw/glm-5.2</code></td><td class="n">2</td></tr>
+<tr><td><code>apiclaw/glm-5.3</code></td><td class="n">2</td></tr>
+<tr><td><code>apiclaw/glm-5.3-flash</code></td><td class="n">2</td></tr>
+<tr><td><code>apiclaw/gpt-6-sol</code></td><td class="n">3</td></tr>
+<tr><td><code>apiclaw/kimi-k3</code></td><td class="n">2</td></tr>
+<tr><td><code>apiclaw/qwen3.8-flash</code></td><td class="n">2</td></tr>
+<tr><td><code>apiclaw/qwen3.8-max</code></td><td class="n">2</td></tr>
+<tr><td><code>apiclaw/qwen3.8-max-0902</code></td><td class="n">2</td></tr>
+</table></div>
+<p class="mut">APIClaw also serves Gemini, Mistral, Llama, Cohere and Grok models; list the IDs your key can use with <code>GET https://apiclaw.biz/v1/models</code>. OpenAI-format clients use <code>https://apiclaw.biz/v1</code>; Claude Code uses <code>https://apiclaw.biz</code> (no <code>/v1</code>). Billing is crypto via NOWPayments. The free trial is 50 requests, no card.</p>
+
+<h2>FAQ</h2>
+<h3>How much does a coding agent cost per month on the Claude API?</h3>
+<p>Multiply requests per day by tokens per request and the list price. Example: 300 requests/day with 30,000 input tokens (60% cached) and 1,000 output tokens on Claude Sonnet 5.5 at $2 input, $0.20 cache read and $10 output per million tokens is about $0.0376 per request, or roughly $338/month over 30 days, before cache-write surcharges.</p>
+<h3>Is a flat-rate LLM API cheaper than paying per token?</h3>
+<p>Only above a certain volume. At low volume (a few dozen modest calls a day) per-token billing is often under $19/month and is the cheaper choice. For agent workloads that re-send large contexts hundreds of times a day, a flat plan such as APIClaw&#x27;s $19 to $129/month tiers usually costs less. The calculator shows which side of the line you are on.</p>
+<h3>What is a request weight?</h3>
+<p>APIClaw counts heavier models as more than one request against your daily quota. According to APIClaw&#x27;s public model list, Claude Sonnet 5.5 has a weight of 2, Claude Opus 5.5, Claude Fable 5.1 and GPT-6 Sol a weight of 3, and DeepSeek V4 Pro a weight of 1.</p>
+<h3>How does OpenRouter pricing compare?</h3>
+<p>OpenRouter bills the provider&#x27;s list price per token and charges a 5.5% fee when you buy credits on the Standard plan (8% on Business), so it costs slightly more than going direct for the same model and tokens.</p>
+<h3>Can Claude Pro or Max replace API spend for Claude Code?</h3>
+<p>Often, yes, for individual use: Claude Code is included in Pro ($20/month) and Max ($100 or $200/month), with usage limits on a rolling 5-hour window plus weekly limits. Anthropic doesn&#x27;t publish those limits as request counts, so the calculator can&#x27;t tell you whether your workload fits.</p>
+<h3>Who made this calculator?</h3>
+<p>The APIClaw team. APIClaw is one of the options compared; all other prices come from official pricing pages linked on this page.</p>
+
+<h2>Related</h2>
+<ul>
+<li><a href="cheapest-api-for-claude-code.html">Cheapest API for Claude Code</a></li>
+<li><a href="flat-rate-claude-api.html">Flat-rate Claude API</a></li>
+<li><a href="openrouter-alternative-fixed-price.html">OpenRouter alternative at a fixed price</a></li>
+<li><a href="https://github.com/ankita37105/awesome-flat-rate-llm-apis">awesome-flat-rate-llm-apis</a>: curated list of flat-rate and request-based LLM APIs</li>
+<li><a href="https://github.com/ankita37105/openai-compatible-api-gateways">OpenAI-compatible API gateways compared</a></li>
+</ul>
+<p class="mut">Built by the APIClaw team. Source: <a href="https://github.com/ankita37105/llm-api-cost-notes/blob/main/calculator.html">calculator.html</a>, CC0. Estimates only; check each vendor's pricing page before buying.</p>
+</main>
+<script>
+const P={
+ "claude-sonnet-5.5":{n:"Claude Sonnet 5.5",v:"anthropic",i:2,c:0.20,o:10,w:2,id:"apiclaw/claude-sonnet-5.5"},
+ "claude-opus-5.5":{n:"Claude Opus 5.5",v:"anthropic",i:4,c:0.20,o:20,w:3,id:"apiclaw/claude-opus-5.5"},
+ "claude-fable-5.1":{n:"Claude Fable 5.1",v:"anthropic",i:10,c:0.25,o:50,w:3,id:"apiclaw/claude-fable-5.1"},
+ "gpt-6-sol":{n:"GPT-6 Sol",v:"openai",i:2,c:0.20,o:10,li:4,lc:0.40,lo:15,w:3,id:"apiclaw/gpt-6-sol"}};
+const PLANS=[{"name": "Plus", "price": 19, "limit": 500}, {"name": "Pro", "price": 39, "limit": 1000}, {"name": "Max", "price": 59, "limit": 1500}, {"name": "Ultimate", "price": 69, "limit": 3000}, {"name": "Ultimate Plus", "price": 89, "limit": 4000}, {"name": "Ultimate Pro", "price": 99, "limit": 6000}, {"name": "Ultimate Max", "price": 129, "limit": 8000}];
+const $=id=>document.getElementById(id), fmt=x=>"$"+(x>=100?Math.round(x).toLocaleString("en-US"):x.toFixed(2));
+const sel=$("m");for(const k in P){const o=document.createElement("option");o.value=k;o.textContent=P[k].n;sel.appendChild(o)}
+const qs=new URLSearchParams(location.search);
+for(const [k,id] of [["model","m"],["rpd","r"],["in","i"],["out","o"],["cache","c"],["days","d"]]) if(qs.has(k)) $(id).value=qs.get(k);
+if(!P[sel.value]) sel.value="claude-sonnet-5.5";
+function calc(){
+ const m=P[sel.value], r=Math.max(0,+$("r").value||0), i=Math.max(0,+$("i").value||0), o=Math.max(0,+$("o").value||0), c=Math.min(100,Math.max(0,+$("c").value||0))/100, d=Math.max(1,+$("d").value||30);
+ let pi=m.i,pc=m.c,po=m.o,long=false; if(m.li&&i>272000){pi=m.li;pc=m.lc;po=m.lo;long=true}
+ const per=(i*(1-c)*pi+i*c*pc+o*po)/1e6, direct=per*r*d, orr=direct*1.055;
+ const wr=r*m.w, plan=PLANS.find(p=>p.limit>=wr);
+ const rows=[];
+ const vname=m.v==="anthropic"?'<a href="https://claude.com/pricing">Anthropic API</a> (direct)':'<a href="https://platform.openai.com/docs/pricing">OpenAI API</a> (direct)';
+ rows.push([vname,"Per token, list price",direct,"$"+per.toFixed(4)+" per request"+(long?"; long-context rates (>272K input)":"")]);
+ rows.push(['<a href="https://openrouter.ai/pricing">OpenRouter</a>',"Per token + 5.5% credit fee",orr,"Same model at provider list price"]);
+ if(m.v==="anthropic"){
+  rows.push(['<a href="https://claude.com/pricing">Claude Pro</a>',"Subscription",20,"Claude Code included; 5-hour and weekly limits; no published request count"]);
+  rows.push(['<a href="https://claude.com/pricing">Claude Max 5x</a>',"Subscription",100,"5x Pro usage per 5-hour session + $100/mo API credits; limits not published as requests"]);
+  rows.push(['<a href="https://claude.com/pricing">Claude Max 20x</a>',"Subscription",200,"20x Pro usage per 5-hour session + $200/mo API credits; limits not published as requests"]);
+ }
+ if(plan) rows.push(['<a href="https://apiclaw.biz/public/plans">APIClaw '+plan.name+'</a>',"Flat, "+plan.limit.toLocaleString("en-US")+" weighted req/day",plan.price,r.toLocaleString("en-US")+" req/day × weight "+m.w+" = "+wr.toLocaleString("en-US")+" weighted; model <code>"+m.id+"</code>; tokens per request not capped"]);
+ else rows.push(['<a href="https://apiclaw.biz">APIClaw</a>',"Flat",null,wr.toLocaleString("en-US")+" weighted req/day is above the largest public plan (8,000); Custom plan by contact"]);
+ const nums=rows.filter(x=>x[2]!=null&&!/Claude (Pro|Max)/.test(x[0])).map(x=>x[2]), min=Math.min(...nums);
+ $("out").tBodies[0].innerHTML=rows.map(x=>'<tr'+(x[2]===min?' class="best"':'')+'><td>'+x[0]+'</td><td>'+x[1]+'</td><td class="n">'+(x[2]==null?"—":fmt(x[2]))+'</td><td>'+x[3]+'</td></tr>').join("");
+ let v;
+ if(!plan) v="At this volume the public APIClaw plans don't cover you; per-token direct is <strong>"+fmt(direct)+"/month</strong>.";
+ else if(direct<=plan.price) v='<span class="warn"><strong>Per-token is cheaper here:</strong> '+fmt(direct)+'/month direct vs '+fmt(plan.price)+'/month on APIClaw '+plan.name+'. Stay pay-as-you-go unless your volume grows.</span>';
+ else v="<strong>Flat-rate is cheaper here:</strong> APIClaw "+plan.name+" at "+fmt(plan.price)+"/month vs "+fmt(direct)+"/month at "+(m.v==="anthropic"?"Anthropic":"OpenAI")+" list price ("+(direct/plan.price).toFixed(1)+"× more). If a Claude subscription's limits fit your usage, compare those rows too.";
+ $("verdict").innerHTML=v;
+ const u=new URL(location.href);u.search=new URLSearchParams({model:sel.value,rpd:r,in:i,out:o,cache:Math.round(c*100),days:d}).toString();history.replaceState(null,"",u);
+}
+document.querySelectorAll("#f input,#f select").forEach(e=>e.addEventListener("input",calc));
+$("share").onclick=()=>{navigator.clipboard&&navigator.clipboard.writeText(location.href).then(()=>{$("copied").textContent="Link copied"},()=>{$("copied").textContent=location.href})};
+calc();
+</script>
+</body></html>
