@@ -1,0 +1,344 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "APIClaw API",
+    "version": "1.0.0",
+    "description": "APIClaw (https://apiclaw.biz) is a flat-rate, OpenAI-compatible AI API gateway.\nOne API key and one base URL (https://apiclaw.biz/v1) work with standard OpenAI\nSDKs and tools. Plans run from $19 to $129 per month with crypto billing, and a\nfree 50-request trial is available.\n\nAPIClaw routes requests to models available through publicly available sources\nand provider APIs.\n\nNote: this is APIClaw at apiclaw.biz. It is not affiliated with apiclaw.io.\n",
+    "contact": {
+      "name": "APIClaw Team",
+      "url": "https://t.me/Apiclaw_support"
+    },
+    "x-logo": {
+      "url": "https://ankita37105.github.io/llm-api-cost-notes/apiclaw-logo.png"
+    }
+  },
+  "servers": [
+    {
+      "url": "https://apiclaw.biz/v1",
+      "description": "APIClaw production"
+    }
+  ],
+  "security": [
+    {
+      "bearerAuth": []
+    }
+  ],
+  "tags": [
+    {
+      "name": "Chat",
+      "description": "OpenAI-compatible chat completions"
+    },
+    {
+      "name": "Models",
+      "description": "Available models"
+    }
+  ],
+  "externalDocs": {
+    "description": "APIClaw website",
+    "url": "https://apiclaw.biz"
+  },
+  "paths": {
+    "/chat/completions": {
+      "post": {
+        "tags": [
+          "Chat"
+        ],
+        "operationId": "createChatCompletion",
+        "summary": "Create a chat completion",
+        "description": "Generates a model response for a conversation. Set `stream` to true to receive server-sent events.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChatCompletionRequest"
+              },
+              "example": {
+                "model": "apiclaw/claude-sonnet-5.5",
+                "messages": [
+                  {
+                    "role": "system",
+                    "content": "You are a helpful assistant."
+                  },
+                  {
+                    "role": "user",
+                    "content": "Hello!"
+                  }
+                ],
+                "temperature": 0.7,
+                "max_tokens": 256,
+                "stream": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Chat completion (JSON), or a text/event-stream when `stream` is true.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatCompletionResponse"
+                }
+              },
+              "text/event-stream": {
+                "schema": {
+                  "type": "string",
+                  "description": "Server-sent events, each `data:` line holding a chat completion chunk; terminated by `data: [DONE]`."
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/models": {
+      "get": {
+        "tags": [
+          "Models"
+        ],
+        "operationId": "listModels",
+        "summary": "List models",
+        "description": "Lists the models available to the API key.",
+        "responses": {
+          "200": {
+            "description": "List of models",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelList"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "APIClaw API key, sent as `Authorization: Bearer <key>`."
+      }
+    },
+    "responses": {
+      "Error": {
+        "description": "Error response",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      }
+    },
+    "schemas": {
+      "ChatMessage": {
+        "type": "object",
+        "required": [
+          "role",
+          "content"
+        ],
+        "properties": {
+          "role": {
+            "type": "string",
+            "enum": [
+              "system",
+              "user",
+              "assistant",
+              "tool"
+            ]
+          },
+          "content": {
+            "type": "string",
+            "nullable": true
+          },
+          "name": {
+            "type": "string"
+          }
+        }
+      },
+      "ChatCompletionRequest": {
+        "type": "object",
+        "required": [
+          "model",
+          "messages"
+        ],
+        "properties": {
+          "model": {
+            "type": "string",
+            "description": "Model ID, for example `apiclaw/claude-sonnet-5.5`.",
+            "example": "apiclaw/claude-sonnet-5.5"
+          },
+          "messages": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "$ref": "#/components/schemas/ChatMessage"
+            }
+          },
+          "temperature": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 2,
+            "default": 1
+          },
+          "max_tokens": {
+            "type": "integer",
+            "minimum": 1,
+            "nullable": true
+          },
+          "stream": {
+            "type": "boolean",
+            "default": false
+          }
+        }
+      },
+      "ChatCompletionChoice": {
+        "type": "object",
+        "properties": {
+          "index": {
+            "type": "integer"
+          },
+          "message": {
+            "$ref": "#/components/schemas/ChatMessage"
+          },
+          "finish_reason": {
+            "type": "string",
+            "nullable": true,
+            "example": "stop"
+          }
+        }
+      },
+      "Usage": {
+        "type": "object",
+        "properties": {
+          "prompt_tokens": {
+            "type": "integer"
+          },
+          "completion_tokens": {
+            "type": "integer"
+          },
+          "total_tokens": {
+            "type": "integer"
+          }
+        }
+      },
+      "ChatCompletionResponse": {
+        "type": "object",
+        "required": [
+          "id",
+          "object",
+          "created",
+          "model",
+          "choices"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "chatcmpl-123"
+          },
+          "object": {
+            "type": "string",
+            "example": "chat.completion"
+          },
+          "created": {
+            "type": "integer",
+            "example": 1793000000
+          },
+          "model": {
+            "type": "string",
+            "example": "apiclaw/claude-sonnet-5.5"
+          },
+          "choices": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ChatCompletionChoice"
+            }
+          },
+          "usage": {
+            "$ref": "#/components/schemas/Usage"
+          }
+        }
+      },
+      "Model": {
+        "type": "object",
+        "required": [
+          "id",
+          "object"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "apiclaw/claude-sonnet-5.5"
+          },
+          "object": {
+            "type": "string",
+            "example": "model"
+          },
+          "created": {
+            "type": "integer"
+          },
+          "owned_by": {
+            "type": "string",
+            "example": "apiclaw"
+          }
+        }
+      },
+      "ModelList": {
+        "type": "object",
+        "required": [
+          "object",
+          "data"
+        ],
+        "properties": {
+          "object": {
+            "type": "string",
+            "example": "list"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Model"
+            }
+          }
+        }
+      },
+      "Error": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "object",
+            "properties": {
+              "message": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string"
+              },
+              "code": {
+                "type": "string",
+                "nullable": true
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
