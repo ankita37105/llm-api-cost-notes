@@ -131,3 +131,4 @@ Guides:
 - [Streamlit chat app on an OpenAI-compatible API](streamlit-chat-app-openai-compatible-api.html)
 - [Jupyter AI magics with an OpenAI-compatible API](jupyter-ai-magics-openai-compatible-api.html)
 - [Hugging Face InferenceClient with a custom OpenAI-compatible base URL](huggingface-inferenceclient-custom-openai-compatible-base-url.html)
+- [Which cheap OpenAI-compatible API gateway stays cheap? Five costs to check](which-cheap-openai-compatible-api-gateway-stays-cheap-five-costs.html)
