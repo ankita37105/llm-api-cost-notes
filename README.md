@@ -132,3 +132,4 @@ Guides:
 - [Jupyter AI magics with an OpenAI-compatible API](jupyter-ai-magics-openai-compatible-api.html)
 - [Hugging Face InferenceClient with a custom OpenAI-compatible base URL](huggingface-inferenceclient-custom-openai-compatible-base-url.html)
 - [Which cheap OpenAI-compatible API gateway stays cheap? Five costs to check](which-cheap-openai-compatible-api-gateway-stays-cheap-five-costs.html)
+- [What's a cheap LLM API in 2026? Check it against your own usage](cheap-llm-api-2026-check-it-against-your-own-usage.html)
