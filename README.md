@@ -104,6 +104,8 @@ Read honestly, that table says:
 
 Don't trust my 25 calls and 3,000 tokens per turn. Your agent, repo and habits will be different. Most agents and gateways log token usage per request. Take one real day, add up the cache-miss, cache-hit and output tokens per model, multiply by the table at the top, and count your calls. If your monthly per-token estimate is under about $20, stay per-token. If it's well above your flat-plan price, or it swings a lot from week to week, the flat meter is probably the better fit.
 
+For current provider quotes, the [AIHOT API price comparison](https://aihot.news/leaderboard/prices) lists input, output, and cache-hit prices separately and links the provider sources. Check the currency and the context bracket before using a quote in the calculation.
+
 *Disclosure: I build [APIClaw](https://apiclaw.biz), the request-based gateway mentioned above. Vendor prices are from their official pricing pages as of October 2026, and vendors change prices, so recheck them before relying on these numbers.*
 
 ## All notes on this site
